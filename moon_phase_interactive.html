@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>달의 위상 인터랙티브</title>
+<style>
+  :root{
+    --bg:#0b1020;
+    --panel:#121a2f;
+    --text:#eef3ff;
+    --muted:#9fb0d0;
+    --line:#4b5f8a;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:linear-gradient(180deg,#07101f,#10182a);
+    color:var(--text);
+  }
+  .wrap{max-width:1100px;margin:0 auto;padding:28px}
+  h1{font-size:28px;margin:0 0 8px}
+  .sub{color:var(--muted);margin-bottom:22px}
+  .grid{
+    display:grid;
+    grid-template-columns:1.2fr .8fr;
+    gap:22px;
+  }
+  .card{
+    background:rgba(18,26,47,.94);
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:22px;
+    padding:20px;
+    box-shadow:0 12px 35px rgba(0,0,0,.22);
+  }
+  svg{width:100%;height:auto;display:block}
+  .right{text-align:center}
+  #moonCanvas{
+    width:min(300px,80vw);
+    height:min(300px,80vw);
+    display:block;
+    margin:10px auto 16px;
+    filter:drop-shadow(0 0 18px rgba(255,232,140,.18));
+  }
+  .phaseName{font-size:26px;font-weight:700}
+  .phaseDesc{color:var(--muted);min-height:48px;margin-top:8px}
+  .controls{margin-top:22px}
+  input[type=range]{width:100%}
+  .row{
+    display:flex;justify-content:space-between;align-items:center;gap:12px;
+    margin-top:12px;flex-wrap:wrap;
+  }
+  button{
+    border:0;border-radius:12px;padding:10px 16px;font-weight:700;cursor:pointer;
+    background:#e9efff;color:#1a2340;
+  }
+  .badge{
+    background:#202d50;border:1px solid rgba(255,255,255,.08);
+    border-radius:999px;padding:8px 12px;color:#dfe7ff;
+  }
+  .note{
+    margin-top:20px;padding:14px 16px;border-radius:14px;
+    background:#17213a;color:#cbd7f3;font-size:14px;
+  }
+  @media (max-width:800px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🌙 달의 위상 인터랙티브</h1>
+  <div class="sub">슬라이더를 움직이거나 자동재생을 눌러 달의 위치와 보이는 모양을 확인해 보세요.</div>
+
+  <div class="grid">
+    <div class="card">
+      <svg id="space" viewBox="0 0 640 440" aria-label="태양 지구 달의 위치 관계">
+        <defs>
+          <radialGradient id="sunGlow">
+            <stop offset="0%" stop-color="#fff7b1"/>
+            <stop offset="55%" stop-color="#ffd54f"/>
+            <stop offset="100%" stop-color="#ff9f1c"/>
+          </radialGradient>
+          <radialGradient id="earthGlow">
+            <stop offset="0%" stop-color="#8fd4ff"/>
+            <stop offset="100%" stop-color="#2e6dc5"/>
+          </radialGradient>
+        </defs>
+        <text x="18" y="28" fill="#9fb0d0" font-size="16">우주에서 본 모습 (북극 상공)</text>
+
+        <circle cx="92" cy="220" r="54" fill="url(#sunGlow)"/>
+        <text x="92" y="292" text-anchor="middle" fill="#eef3ff" font-size="18">태양</text>
+
+        <line x1="150" y1="145" x2="585" y2="145" stroke="#f7d365" stroke-opacity=".45" stroke-width="2"/>
+        <line x1="150" y1="220" x2="585" y2="220" stroke="#f7d365" stroke-opacity=".28" stroke-width="2"/>
+        <line x1="150" y1="295" x2="585" y2="295" stroke="#f7d365" stroke-opacity=".45" stroke-width="2"/>
+
+        <ellipse cx="390" cy="220" rx="180" ry="135" fill="none" stroke="#566a96" stroke-width="2" stroke-dasharray="8 8"/>
+        <circle cx="390" cy="220" r="34" fill="url(#earthGlow)"/>
+        <text x="390" y="270" text-anchor="middle" fill="#eef3ff" font-size="18">지구</text>
+
+        <g id="moonGroup">
+          <circle id="moonDot" cx="210" cy="220" r="18" fill="#f2f2ea" stroke="#111827" stroke-width="1"/>
+          <path id="moonShade" d="" fill="#202636" opacity=".96"/>
+        </g>
+        <text id="orbitLabel" x="390" y="408" text-anchor="middle" fill="#9fb0d0" font-size="15"></text>
+      </svg>
+    </div>
+
+    <div class="card right">
+      <div style="color:#9fb0d0">지구에서 본 모습 (북반구)</div>
+      <canvas id="moonCanvas" width="360" height="360"></canvas>
+      <div class="phaseName" id="phaseName">삭(신월)</div>
+      <div class="phaseDesc" id="phaseDesc">달이 태양과 지구 사이에 있어 밝은 면이 지구 반대쪽을 향합니다.</div>
+    </div>
+  </div>
+
+  <div class="card controls">
+    <input id="daySlider" type="range" min="0" max="29.53" step="0.05" value="0" />
+    <div class="row">
+      <div class="badge"><span id="dayText">0.0</span>일</div>
+      <button id="playBtn">▶ 자동재생</button>
+      <div class="badge">한 주기 ≈ 29.53일</div>
+    </div>
+    <div class="note">
+      달의 위상은 달이 지구에서 얼마나 가까운지보다 <b>태양·지구·달의 위치 관계</b>에 따라 결정됩니다.
+      보름달일 때 달이 지구에 특히 가까우면 그때 슈퍼문으로 보일 수 있습니다.
+    </div>
+  </div>
+</div>
+
+<script>
+const slider = document.getElementById('daySlider');
+const dayText = document.getElementById('dayText');
+const phaseName = document.getElementById('phaseName');
+const phaseDesc = document.getElementById('phaseDesc');
+const playBtn = document.getElementById('playBtn');
+const moonDot = document.getElementById('moonDot');
+const moonShade = document.getElementById('moonShade');
+const orbitLabel = document.getElementById('orbitLabel');
+const canvas = document.getElementById('moonCanvas');
+const ctx = canvas.getContext('2d');
+
+let playing = false, timer = null;
+
+function phaseInfo(day){
+  const p = (day % 29.53) / 29.53;
+  if (p < .03 || p > .97) return ["삭(신월)", "달이 태양과 지구 사이에 있어 밝은 면이 지구 반대쪽을 향합니다."];
+  if (p < .22) return ["초승달", "오른쪽부터 조금씩 밝아지는 시기입니다."];
+  if (p < .28) return ["상현달", "달의 오른쪽 절반이 밝게 보입니다."];
+  if (p < .47) return ["차오르는 달", "보름달을 향해 밝은 부분이 점점 넓어집니다."];
+  if (p < .53) return ["보름달(망)", "태양과 달이 지구의 반대편에 있어 달의 밝은 면이 지구를 향합니다."];
+  if (p < .72) return ["기우는 달", "보름달 이후 밝은 부분이 점점 줄어듭니다."];
+  if (p < .78) return ["하현달", "달의 왼쪽 절반이 밝게 보입니다."];
+  return ["그믐달", "왼쪽의 가느다란 부분만 밝게 남는 시기입니다."];
+}
+
+function drawMoon(day){
+  const w=canvas.width,h=canvas.height,r=150,cx=w/2,cy=h/2;
+  ctx.clearRect(0,0,w,h);
+
+  const img = ctx.createImageData(w,h);
+  const data = img.data;
+  const E = 2*Math.PI*(day/29.53);
+  const Lx = Math.sin(E), Ly = 0, Lz = -Math.cos(E);
+
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      const nx=(x-cx)/r, ny=(y-cy)/r;
+      const rr=nx*nx+ny*ny;
+      const i=(y*w+x)*4;
+      if(rr<=1){
+        const nz=Math.sqrt(1-rr);
+        const light=Math.max(0,nx*Lx+ny*Ly+nz*Lz);
+        const limb=Math.pow(nz,0.25);
+        const base=18;
+        const lum=base + light*225*limb;
+        data[i]=Math.min(255,lum*1.02);
+        data[i+1]=Math.min(255,lum*1.00);
+        data[i+2]=Math.min(255,lum*.88);
+        data[i+3]=255;
+      }else{
+        data[i+3]=0;
+      }
+    }
+  }
+  ctx.putImageData(img,0,0);
+
+  ctx.beginPath();
+  ctx.arc(cx,cy,r,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,255,255,.16)';
+  ctx.lineWidth=2;
+  ctx.stroke();
+}
+
+function update(){
+  const day=parseFloat(slider.value);
+  dayText.textContent=day.toFixed(1);
+  const [name,desc]=phaseInfo(day);
+  phaseName.textContent=name;
+  phaseDesc.textContent=desc;
+
+  const t=day/29.53;
+  const ang=Math.PI + 2*Math.PI*t; // day 0 = sunward(left), full moon = right
+  const cx=390,cy=220,rx=180,ry=135;
+  const x=cx+rx*Math.cos(ang), y=cy+ry*Math.sin(ang);
+  moonDot.setAttribute('cx',x);
+  moonDot.setAttribute('cy',y);
+
+  // Small moon in space view: illuminated side always faces Sun (left)
+  const r=18;
+  moonShade.setAttribute('d',
+    `M ${x} ${y-r} A ${r} ${r} 0 0 1 ${x} ${y+r} L ${x} ${y-r} Z`
+  );
+  orbitLabel.textContent = `${day.toFixed(1)}일 · ${name}`;
+  drawMoon(day);
+}
+
+slider.addEventListener('input', update);
+playBtn.addEventListener('click',()=>{
+  playing=!playing;
+  playBtn.textContent=playing?'⏸ 일시정지':'▶ 자동재생';
+  if(playing){
+    timer=setInterval(()=>{
+      let v=parseFloat(slider.value)+0.12;
+      if(v>29.53) v=0;
+      slider.value=v;
+      update();
+    },50);
+  }else clearInterval(timer);
+});
+
+update();
+</script>
+</body>
+</html>
